@@ -60,12 +60,17 @@ st.markdown("""
                 font-size: 1.0rem !important; 
             }
             h3 { font-size: 1.6rem !important; }
-            div[data-testid="stHorizontalBlock"] {
-                flex-wrap: nowrap !important;
-            }
+            
+            /* DE HORIZONTALE SCROLL-BOOSDOENER IS HIER VERWIJDERD! */
+            
             button {
                 padding-left: 0.5rem !important;
                 padding-right: 0.5rem !important;
+            }
+            
+            /* Maak de gestapelde kolommen op mobiel super strak en compact */
+            div[data-testid="column"] {
+                padding-bottom: 0rem !important;
             }
         }
     </style>
