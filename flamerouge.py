@@ -4,7 +4,7 @@ import random
 # --- Configuratie & Constanten ---
 st.set_page_config(page_title="Flamme Rouge Automator", page_icon="🚴", layout="centered")
 
-# CSS HACK: Import Oswald font, force ALL-CAPS, eliminate whitespace AND style exhaustion card
+# CSS HACK: Import Oswald font, force ALL-CAPS, eliminate whitespace EN Mobiele Optimalisatie
 st.markdown("""
     <style>
         /* Import Oswald from Google Fonts */
@@ -17,20 +17,14 @@ st.markdown("""
             letter-spacing: 1px !important;
         }
 
-        /* VERGROOT DE STANDAARD TEKST */
+        /* VERGROOT DE STANDAARD TEKST VOOR LAPTOPS/TABLETS */
         p, span, label, button, div[data-baseweb="checkbox"] {
             font-size: 1.25rem !important; 
         }
-
-        /* VERGROOT DE TITELS */
-        h3 {
-            font-size: 2.2rem !important; 
-        }
+        h3 { font-size: 2.2rem !important; }
 
         /* Zorg dat titels en dikgedrukte tekst echt knallen */
-        h1, h2, h3, strong, b {
-            font-weight: 700 !important;
-        }
+        h1, h2, h3, strong, b { font-weight: 700 !important; }
 
         .block-container {
             padding-top: 3rem !important; 
@@ -44,9 +38,7 @@ st.markdown("""
             margin-top: 0.5rem !important;
             margin-bottom: 0.5rem !important;
         }
-        h1, h2, h3 {
-            padding-bottom: 0rem !important;
-        }
+        h1, h2, h3 { padding-bottom: 0rem !important; }
         
         /* SPECIAL STYLING FOR EXHAUSTION CARD */
         button[kind="primary"] {
@@ -60,6 +52,21 @@ st.markdown("""
         button[kind="primary"]:hover {
             background-color: rgba(255, 75, 75, 0.3) !important;
             border-color: #ff4b4b !important;
+        }
+
+        /* 📱 MOBIELE OPTIMALISATIE */
+        @media (max-width: 600px) {
+            p, span, label, button, div[data-baseweb="checkbox"] {
+                font-size: 1.0rem !important; 
+            }
+            h3 { font-size: 1.6rem !important; }
+            div[data-testid="stHorizontalBlock"] {
+                flex-wrap: nowrap !important;
+            }
+            button {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
         }
     </style>
 """, unsafe_allow_html=True)
@@ -87,7 +94,8 @@ class Cyclist:
         random.shuffle(self.deck)
         self.played_card = None
         self.drawn_hand = [] 
-        self.used_cards = [] # NIEUW: Archief voor permanent gespeelde kaarten
+        self.used_cards = [] 
+        self.is_finished = False
 
     def draw_cards(self):
         if not self.deck:
@@ -103,7 +111,7 @@ class Cyclist:
         self.drawn_hand.remove(card)
 
     def undo_play(self):
-        if self.played_card is not None:
+        if self.played_card is not None and self.played_card != "🏁":
             self.drawn_hand.append(self.played_card)
             self.drawn_hand.sort(key=lambda x: x if isinstance(x, int) else 2)
             self.played_card = None
@@ -113,30 +121,31 @@ class Cyclist:
             self.deck.extend(self.drawn_hand)
             random.shuffle(self.deck)
             self.drawn_hand = []
-        # Voeg de gespeelde kaart toe aan de used_cards!
-        if self.played_card is not None and self.played_card != 0:
+        if self.played_card is not None and self.played_card != 0 and self.played_card != "🏁":
             self.used_cards.append(self.played_card)
 
     def play_auto(self):
+        if self.is_finished:
+            self.played_card = "🏁"
+            return self.played_card
+            
         if not self.deck:
             self.played_card = 0
         else:
             self.played_card = self.deck.pop(0)
-            self.used_cards.append(self.played_card) # Voeg toe aan archief voor auto-teams
+            self.used_cards.append(self.played_card) 
         return self.played_card
 
     def add_exhaustion(self):
-        self.deck.append(EXHAUSTION_CARD)
-        random.shuffle(self.deck)
+        if not self.is_finished:
+            self.deck.append(EXHAUSTION_CARD)
+            random.shuffle(self.deck)
 
     def get_inventory_html(self):
-        # Genereer de HTML voor de doorgekraste inventaris lijst
         base_cards = ROULEUR_CARDS.copy() if self.rider_type == "Rouleur" else SPRINTER_CARDS.copy()
         used_temp = self.used_cards.copy()
         
         html = "<div style='line-height: 1.8;'>"
-        
-        # Standaard kaarten afstrepen
         for card in base_cards:
             if card in used_temp:
                 used_temp.remove(card)
@@ -144,14 +153,11 @@ class Cyclist:
             else:
                 html += f"<span style='font-weight: bold; margin-right: 12px;'>{card}</span>"
                 
-        # Vermoeidheidskaarten toevoegen
         ex_in_deck = self.deck.count(EXHAUSTION_CARD)
         ex_used = self.used_cards.count(EXHAUSTION_CARD)
         
-        # Gespeelde vermoeidheid doorstrepen (Nu tonen we hardcoded een rode '2')
         for _ in range(ex_used):
             html += f"<span style='text-decoration: line-through; opacity: 0.4; color: #ff4b4b; margin-right: 12px;'>2</span>"
-        # Ongebruikte vermoeidheid toevoegen (Nu tonen we hardcoded een rode '2')
         for _ in range(ex_in_deck):
             html += f"<span style='font-weight: bold; color: #ff4b4b; margin-right: 12px;'>2</span>"
             
@@ -172,32 +178,27 @@ def start_game(num_humans, num_auto, human_names, human_colors):
     available_colors = ALL_COLORS.copy()
     for i in range(num_humans):
         color = human_colors[i]
-        if color in available_colors:
-            available_colors.remove(color)
+        if color in available_colors: available_colors.remove(color)
         st.session_state.teams.append({
             "name": human_names[i] if human_names[i] else f"Speler {i+1}",
-            "color": color,
-            "is_human": True,
-            "Rouleur": Cyclist("Rouleur", True),
-            "Sprinter": Cyclist("Sprinter", True)
+            "color": color, "is_human": True,
+            "Rouleur": Cyclist("Rouleur", True), "Sprinter": Cyclist("Sprinter", True)
         })
     for i in range(num_auto):
         color = available_colors.pop(0)
         st.session_state.teams.append({
-            "name": color, 
-            "color": color,
-            "is_human": False,
-            "Rouleur": Cyclist("Rouleur", False),
-            "Sprinter": Cyclist("Sprinter", False)
+            "name": color, "color": color, "is_human": False,
+            "Rouleur": Cyclist("Rouleur", False), "Sprinter": Cyclist("Sprinter", False)
         })
     start_round()
 
 def start_round():
     st.session_state.human_queue = []
     for idx, team in enumerate(st.session_state.teams):
-        team["Rouleur"].played_card = None
-        team["Sprinter"].played_card = None
-        if team["is_human"]:
+        team["Rouleur"].played_card = "🏁" if team["Rouleur"].is_finished else None
+        team["Sprinter"].played_card = "🏁" if team["Sprinter"].is_finished else None
+        
+        if team["is_human"] and (not team["Rouleur"].is_finished or not team["Sprinter"].is_finished):
             st.session_state.human_queue.append(idx)
             
     if st.session_state.human_queue:
@@ -211,8 +212,8 @@ def start_round():
 def process_auto_teams():
     for team in st.session_state.teams:
         if not team["is_human"]:
-            team["Rouleur"].play_auto()
-            team["Sprinter"].play_auto()
+            if not team["Rouleur"].is_finished: team["Rouleur"].play_auto()
+            if not team["Sprinter"].is_finished: team["Sprinter"].play_auto()
 
 def next_turn():
     st.session_state.show_hands = False
@@ -253,56 +254,56 @@ elif st.session_state.phase == 'playing':
 
     if not st.session_state.show_hands:
         if st.button("Toon mijn kaarten 👁️", use_container_width=True):
-            team['Rouleur'].draw_cards()
-            team['Sprinter'].draw_cards()
+            if not team['Rouleur'].is_finished: team['Rouleur'].draw_cards()
+            if not team['Sprinter'].is_finished: team['Sprinter'].draw_cards()
             st.session_state.show_hands = True
             st.rerun()
     else:
-        st.markdown("**🚴 Rouleur**")
-        if team['Rouleur'].played_card is None:
-            if team['Rouleur'].drawn_hand:
-                btn_cols = st.columns(len(team['Rouleur'].drawn_hand))
-                for i, card in enumerate(team['Rouleur'].drawn_hand):
-                    b_type = "primary" if card == EXHAUSTION_CARD else "secondary"
-                    if btn_cols[i].button(f"**{card}**", key=f"r_{team_idx}_{i}", use_container_width=True, type=b_type):
-                        team['Rouleur'].play_card(card)
-                        st.rerun()
+        if not team['Rouleur'].is_finished:
+            st.markdown("**🚴 Rouleur**")
+            if team['Rouleur'].played_card is None or team['Rouleur'].played_card == "🏁":
+                if team['Rouleur'].drawn_hand:
+                    btn_cols = st.columns(len(team['Rouleur'].drawn_hand))
+                    for i, card in enumerate(team['Rouleur'].drawn_hand):
+                        b_type = "primary" if card == EXHAUSTION_CARD else "secondary"
+                        if btn_cols[i].button(f"**{card}**", key=f"r_{team_idx}_{i}", use_container_width=True, type=b_type):
+                            team['Rouleur'].play_card(card)
+                            st.rerun()
+                else:
+                    st.warning("Deck leeg!"); team['Rouleur'].played_card = 0
             else:
-                st.warning("Deck leeg!"); team['Rouleur'].played_card = 0
-        else:
-            c1, c2 = st.columns([3, 1])
-            c1.success(f"**{team['Rouleur'].played_card}**")
-            if c2.button("↩️", key=f"undo_r_{team_idx}", use_container_width=True): team['Rouleur'].undo_play(); st.rerun()
+                c1, c2 = st.columns([3, 1])
+                c1.success(f"**{team['Rouleur'].played_card}**")
+                if c2.button("↩️", key=f"undo_r_{team_idx}", use_container_width=True): team['Rouleur'].undo_play(); st.rerun()
 
-        st.markdown("**⚡ Sprinter**")
-        if team['Sprinter'].played_card is None:
-            if team['Sprinter'].drawn_hand:
-                btn_cols = st.columns(len(team['Sprinter'].drawn_hand))
-                for i, card in enumerate(team['Sprinter'].drawn_hand):
-                    b_type = "primary" if card == EXHAUSTION_CARD else "secondary"
-                    if btn_cols[i].button(f"**{card}**", key=f"s_{team_idx}_{i}", use_container_width=True, type=b_type):
-                        team['Sprinter'].play_card(card)
-                        st.rerun()
+        if not team['Sprinter'].is_finished:
+            st.markdown("**⚡ Sprinter**")
+            if team['Sprinter'].played_card is None or team['Sprinter'].played_card == "🏁":
+                if team['Sprinter'].drawn_hand:
+                    btn_cols = st.columns(len(team['Sprinter'].drawn_hand))
+                    for i, card in enumerate(team['Sprinter'].drawn_hand):
+                        b_type = "primary" if card == EXHAUSTION_CARD else "secondary"
+                        if btn_cols[i].button(f"**{card}**", key=f"s_{team_idx}_{i}", use_container_width=True, type=b_type):
+                            team['Sprinter'].play_card(card)
+                            st.rerun()
+                else:
+                    st.warning("Deck leeg!"); team['Sprinter'].played_card = 0
             else:
-                st.warning("Deck leeg!"); team['Sprinter'].played_card = 0
-        else:
-            c1, c2 = st.columns([3, 1])
-            c1.success(f"**{team['Sprinter'].played_card}**")
-            if c2.button("↩️", key=f"undo_s_{team_idx}", use_container_width=True): team['Sprinter'].undo_play(); st.rerun()
+                c1, c2 = st.columns([3, 1])
+                c1.success(f"**{team['Sprinter'].played_card}**")
+                if c2.button("↩️", key=f"undo_s_{team_idx}", use_container_width=True): team['Sprinter'].undo_play(); st.rerun()
 
         if team['Rouleur'].played_card is not None and team['Sprinter'].played_card is not None:
             st.write("---")
             if st.button("Bevestig keuzes ➡️", use_container_width=True):
-                team['Rouleur'].confirm_turn()
-                team['Sprinter'].confirm_turn()
+                if not team['Rouleur'].is_finished: team['Rouleur'].confirm_turn()
+                if not team['Sprinter'].is_finished: team['Sprinter'].confirm_turn()
                 next_turn()
                 st.rerun()
 
 # 3. OVERZICHT FASE
 elif st.session_state.phase == 'summary':
     st.markdown(f"### 📋 Overzicht Ronde {st.session_state.round}")
-    # De extra <br> is hier weggehaald
-    
     for team in st.session_state.teams:
         display_name = f"{team['name']} ({team['color']})" if team['is_human'] else team['color']
         style = COLOR_STYLES.get(team['color'], "background-color: gray; color: white;")
@@ -312,8 +313,6 @@ elif st.session_state.phase == 'summary':
         c1.markdown(badge, unsafe_allow_html=True)
         c2.markdown(f"Rouleur: **{team['Rouleur'].played_card}**")
         c3.markdown(f"Sprinter: **{team['Sprinter'].played_card}**")
-        
-        # Witruimte teruggeschroefd van 15px naar 8px
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
     st.write("---")
@@ -324,11 +323,12 @@ elif st.session_state.phase == 'summary':
 # 4. VERMOEIDHEIDSFASE
 elif st.session_state.phase == 'exhaustion':
     st.markdown("### 🥵 Vermoeidheidsfase")
-    st.caption("Wie rijdt op kop? Vink de renners aan die een kaart ontvangen.")
-    # De extra <br> is hier weggehaald
+    st.caption("Wie vangt de wind? Vink de renners aan die een kaart ontvangen.")
     
-    selected_riders = []
+    selected_exhaustion = []
     for idx, team in enumerate(st.session_state.teams):
+        if team['Rouleur'].is_finished and team['Sprinter'].is_finished: continue
+        
         display_name = f"{team['name']} ({team['color']})" if team['is_human'] else team['color']
         style = COLOR_STYLES.get(team['color'], "background-color: gray; color: white;")
         badge = f'<span style="{style} padding: 4px 12px; border-radius: 6px; font-weight: bold;">{display_name}</span>'
@@ -336,31 +336,57 @@ elif st.session_state.phase == 'exhaustion':
         c1, c2, c3 = st.columns([2, 1, 1])
         with c1: st.markdown(badge, unsafe_allow_html=True)
         with c2: 
-            if st.checkbox("Rouleur", key=f"ex_{idx}_rouleur"): selected_riders.append((team, "Rouleur"))
+            if not team['Rouleur'].is_finished and st.checkbox("Rouleur", key=f"ex_{idx}_rouleur"): selected_exhaustion.append((team, "Rouleur"))
         with c3: 
-            if st.checkbox("Sprinter", key=f"ex_{idx}_sprinter"): selected_riders.append((team, "Sprinter"))
+            if not team['Sprinter'].is_finished and st.checkbox("Sprinter", key=f"ex_{idx}_sprinter"): selected_exhaustion.append((team, "Sprinter"))
+        st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
 
-        # Witruimte teruggeschroefd van 12px naar 4px
+    st.write("---")
+    if st.button("Deel uit en ga naar Finishlijn ➡️", type="primary", use_container_width=True):
+        for team, r_type in selected_exhaustion: team[r_type].add_exhaustion()
+        st.session_state.phase = 'finish'
+        st.rerun()
+
+# 5. FINISH FASE
+elif st.session_state.phase == 'finish':
+    st.markdown("### 🏁 Finishlijn")
+    st.caption("Is er iemand de finish gepasseerd? Vink ze hier aan.")
+    
+    selected_finished = []
+    for idx, team in enumerate(st.session_state.teams):
+        if team['Rouleur'].is_finished and team['Sprinter'].is_finished: continue
+        
+        display_name = f"{team['name']} ({team['color']})" if team['is_human'] else team['color']
+        style = COLOR_STYLES.get(team['color'], "background-color: gray; color: white;")
+        badge = f'<span style="{style} padding: 4px 12px; border-radius: 6px; font-weight: bold;">{display_name}</span>'
+        
+        c1, c2, c3 = st.columns([2, 1, 1])
+        with c1: st.markdown(badge, unsafe_allow_html=True)
+        with c2: 
+            if not team['Rouleur'].is_finished and st.checkbox("Rouleur", key=f"fin_{idx}_rouleur"): selected_finished.append((team, "Rouleur"))
+        with c3: 
+            if not team['Sprinter'].is_finished and st.checkbox("Sprinter", key=f"fin_{idx}_sprinter"): selected_finished.append((team, "Sprinter"))
         st.markdown("<div style='margin-bottom: 4px;'></div>", unsafe_allow_html=True)
 
     st.write("---")
     
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        if st.button("Deel uit en start ronde 🔄", use_container_width=True):
-            for team, r_type in selected_riders: team[r_type].add_exhaustion()
+        if st.button("Bevestig & Start Ronde 🔄", type="primary", use_container_width=True):
+            for team, r_type in selected_finished: team[r_type].is_finished = True
             st.session_state.round += 1
             start_round()
             st.rerun()
+            
     with col_btn2:
         if st.button("Bekijk Deck Inventaris 🗃️", use_container_width=True):
             st.session_state.phase = 'inventory'
             st.rerun()
 
-# 5. INVENTARIS FASE
+# 6. INVENTARIS FASE
 elif st.session_state.phase == 'inventory':
     st.markdown("### 🗃️ Deck Inventaris")
-    st.caption("Doorgestreepte kaarten zijn definitief weggespeeld. Rode kaarten zijn toegevoegde vermoeidheid.")
+    st.caption("Doorgestreepte kaarten zijn weggespeeld. Rode kaarten zijn toegevoegde vermoeidheid.")
     st.markdown("<br>", unsafe_allow_html=True)
     
     for team in st.session_state.teams:
@@ -370,20 +396,19 @@ elif st.session_state.phase == 'inventory':
         
         st.markdown(badge, unsafe_allow_html=True)
         
-        # Rouleur en Sprinter nu onder elkaar in plaats van in kolommen
-        st.markdown("**Rouleur**")
+        r_title = "**Rouleur** 🏁" if team['Rouleur'].is_finished else "**Rouleur**"
+        st.markdown(r_title)
         st.markdown(team['Rouleur'].get_inventory_html(), unsafe_allow_html=True)
         
-        # Een klein beetje ademruimte tussen de twee renners
         st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
         
-        st.markdown("**Sprinter**")
+        s_title = "**Sprinter** 🏁" if team['Sprinter'].is_finished else "**Sprinter**"
+        st.markdown(s_title)
         st.markdown(team['Sprinter'].get_inventory_html(), unsafe_allow_html=True)
         
-        # Ruimte voordat het volgende team begint
         st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
         
     st.write("---")
-    if st.button("⬅️ Terug naar Vermoeidheidsfase", use_container_width=True):
-        st.session_state.phase = 'exhaustion'
+    if st.button("⬅️ Terug", use_container_width=True):
+        st.session_state.phase = 'finish'
         st.rerun()
